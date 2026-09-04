@@ -1,0 +1,16 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@aula-mcp/aula-auth':
+        specifier: link:./aula-mcp/packages/aula-auth
+        version: link:aula-mcp/packages/aula-auth
+      '@aula-mcp/aula-client':
+        specifier: link:./aula-mcp/packages/aula-client
+        version: link:aula-mcp/packages/aula-client

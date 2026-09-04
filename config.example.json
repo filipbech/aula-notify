@@ -1,0 +1,8 @@
+{
+  "guardianId": "your-aula-guardian-login-id",
+  "children": [
+    { "id": 0, "name": "Child One" },
+    { "id": 0, "name": "Child Two" }
+  ],
+  "notifyEmail": "you@example.com"
+}

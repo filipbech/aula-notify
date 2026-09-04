@@ -1,0 +1,14 @@
+{
+  "name": "aula-notify",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "poll": "bun run src/poll.ts",
+    "digest:daily": "bun run src/digest.ts daily",
+    "digest:weekly": "bun run src/digest.ts weekly"
+  },
+  "dependencies": {
+    "@aula-mcp/aula-auth": "link:./aula-mcp/packages/aula-auth",
+    "@aula-mcp/aula-client": "link:./aula-mcp/packages/aula-client"
+  }
+}
