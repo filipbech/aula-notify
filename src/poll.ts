@@ -30,10 +30,12 @@ async function collectThreadItems(client: Awaited<ReturnType<typeof getClient>>)
       thread.latestMessage?.sendDateTime ?? thread.lastMessage?.sendDateTime ?? Date.now(),
     );
 
-    let text = `Subject: ${thread.subject ?? '(no subject)'}\nFrom: ${thread.lastMessage?.sender?.fullName ?? 'unknown'}`;
+    let text = `Subject: ${thread.subject ?? '(no subject)'}`;
     try {
       const full = await client.getMessagesForThread(thread.id);
-      const body = full.messages.map((m) => m.text?.plain ?? stripHtml(m.text?.html ?? '')).join('\n---\n');
+      const body = full.messages
+        .map((m) => `[${m.sender?.fullName ?? 'unknown sender'}]: ${m.text?.plain ?? stripHtml(m.text?.html ?? '')}`)
+        .join('\n---\n');
       if (body.trim()) text += `\n\n${body.slice(0, 4000)}`;
     } catch (err) {
       text += `\n\n(full content unavailable: ${(err as Error).message})`;
@@ -112,6 +114,7 @@ async function main() {
     const result = await classify({
       source: item.source,
       child: item.child,
+      familyChildren: config.children.map((c) => c.name),
       text: item.text,
       receivedAt: item.receivedAt,
       nextDigestAt,
