@@ -1,5 +1,6 @@
 import { getItemsSince, getWatermark, setWatermark, type ClassifiedItem } from './db.ts';
 import { sendEmail } from './email.ts';
+import { env } from './config.ts';
 
 function formatItems(items: ClassifiedItem[]): string {
   if (items.length === 0) return '(nothing)';
@@ -29,7 +30,7 @@ async function runWeekly() {
   const recapDaily = getItemsSince('daily', since);
   const recapImmediate = getItemsSince('immediate', since);
 
-  const body = [
+  const bodyParts = [
     'Weekly Aula digest',
     '',
     'Whole-school items this week:',
@@ -37,7 +38,18 @@ async function runWeekly() {
     '',
     'In case you missed it — already sent this week:',
     formatItems([...recapImmediate, ...recapDaily]),
-  ].join('\n');
+  ];
+
+  if (env.showIgnoredInWeekly) {
+    const ignored = getItemsSince('ignore', since);
+    bodyParts.push(
+      '',
+      '--- IGNORED THIS WEEK (for review while we tune the classifier — set SHOW_IGNORED_IN_WEEKLY=false to remove this section) ---',
+      formatItems(ignored),
+    );
+  }
+
+  const body = bodyParts.join('\n');
 
   await sendEmail(`Aula weekly digest — ${weeklyOnly.length} item(s)`, body);
   setWatermark(watermarkKey, now);

@@ -1,7 +1,7 @@
 import { env } from './config.ts';
 import type { Category } from './db.ts';
 
-export const PROMPT_VERSION = 'v4';
+export const PROMPT_VERSION = 'v5';
 
 const STALE_MS = 24 * 60 * 60 * 1000;
 
@@ -20,10 +20,15 @@ const SAFETY_NET_KEYWORDS = [
   'hjemsendes',
 ];
 
+export interface FamilyChild {
+  name: string;
+  class?: string;
+}
+
 export interface ClassifyInput {
   source: string;
   child: string | null;
-  familyChildren: string[];
+  familyChildren: FamilyChild[];
   text: string;
   receivedAt: Date;
   nextDigestAt: Date;
@@ -63,6 +68,8 @@ If a thread mixes a genuine staff-authored message with off-topic replies from o
 
 Never classify something "weekly_only" if it names a SPECIFIC deadline within roughly the next 1-3 days (e.g. "tomorrow", "by Friday" when today is Wednesday) — a weekly digest would report it too late to be useful, regardless of whose class it concerns. Use "daily" (or "immediate", per the criteria above) instead. This is narrow: a general term/year calendar, a routine policy update, or an open-ended request for interest/volunteers with no imminent closing date is NOT a near-term deadline and stays weekly_only if it's otherwise non-urgent staff content — don't let "mentions a future date" or "eventually needs a reply" alone push something out of weekly_only.
 
+Some of this family's children have a known class (given below); others don't. If an item would otherwise be "immediate" but is confidently and *exclusively* about a specific class/grade that is NOT any of this family's known classes, downgrade it to "daily" instead — still worth a mention, just not an interruption for a class that isn't theirs. Only apply this downgrade using a child whose class is actually known below; never use it to dismiss something involving a child whose class is unlisted (you can't rule them out).
+
 When genuinely unsure between two tiers, prefer the more urgent one — a false positive (an extra email) is far cheaper than a missed item.`;
 
 const RESPONSE_SCHEMA = {
@@ -87,7 +94,11 @@ export async function classify(input: ClassifyInput): Promise<ClassifyResult> {
     throw new Error('GEMINI_API_KEY not set');
   }
 
-  const userPrompt = `This family's children: ${input.familyChildren.join(', ')}
+  const childrenDesc = input.familyChildren
+    .map((c) => (c.class ? `${c.name} (class ${c.class})` : `${c.name} (class unknown)`))
+    .join(', ');
+
+  const userPrompt = `This family's children: ${childrenDesc}
 Next daily digest fires at: ${input.nextDigestAt.toISOString()}
 Item received at: ${input.receivedAt.toISOString()}
 Source: ${input.source}

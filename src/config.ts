@@ -6,6 +6,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export interface Child {
   id: number;
   name: string;
+  class?: string;
 }
 
 export interface Config {
@@ -28,4 +29,5 @@ export const env = {
   geminiApiKey: process.env.GEMINI_API_KEY ?? '',
   resendApiKey: process.env.RESEND_API_KEY ?? '',
   healthcheckUrl: process.env.HEALTHCHECK_URL ?? '',
+  showIgnoredInWeekly: process.env.SHOW_IGNORED_IN_WEEKLY !== 'false',
 };

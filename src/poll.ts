@@ -114,7 +114,7 @@ async function main() {
     const result = await classify({
       source: item.source,
       child: item.child,
-      familyChildren: config.children.map((c) => c.name),
+      familyChildren: config.children.map((c) => ({ name: c.name, class: c.class })),
       text: item.text,
       receivedAt: item.receivedAt,
       nextDigestAt,
