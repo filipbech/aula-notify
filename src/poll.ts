@@ -1,15 +1,19 @@
-import { getClient, childName } from './aula.ts';
+import { getClient } from './aula.ts';
 import { classify, PROMPT_VERSION } from './classify.ts';
 import { isAlreadyLogged, logItem, type ClassifiedItem } from './db.ts';
 import { nextDailyDigestTime } from './digest-time.ts';
 import { config, env } from './config.ts';
 import { sendEmail } from './email.ts';
+import { digestPageHtml } from './email-template.ts';
 
 interface RawItem {
   aula_id: string;
   source: string;
   child: string | null;
+  subject: string;
+  sender: string | null;
   text: string;
+  bodyExcerpt: string;
   receivedAt: Date;
 }
 
@@ -29,19 +33,33 @@ async function collectThreadItems(client: Awaited<ReturnType<typeof getClient>>)
     const receivedAt = new Date(
       thread.latestMessage?.sendDateTime ?? thread.lastMessage?.sendDateTime ?? Date.now(),
     );
+    const subject = thread.subject ?? '(no subject)';
 
-    let text = `Subject: ${thread.subject ?? '(no subject)'}`;
+    let body = '';
+    let sender: string | null = null;
+    let text = `Subject: ${subject}`;
     try {
       const full = await client.getMessagesForThread(thread.id);
-      const body = full.messages
+      sender = full.messages.at(-1)?.sender?.fullName ?? null;
+      body = full.messages
         .map((m) => `[${m.sender?.fullName ?? 'unknown sender'}]: ${m.text?.plain ?? stripHtml(m.text?.html ?? '')}`)
         .join('\n---\n');
       if (body.trim()) text += `\n\n${body.slice(0, 4000)}`;
     } catch (err) {
-      text += `\n\n(full content unavailable: ${(err as Error).message})`;
+      body = `(full content unavailable: ${(err as Error).message})`;
+      text += `\n\n${body}`;
     }
 
-    items.push({ aula_id: aulaId, source: 'message', child: null, text, receivedAt });
+    items.push({
+      aula_id: aulaId,
+      source: 'message',
+      child: null,
+      subject,
+      sender,
+      text,
+      bodyExcerpt: body.slice(0, 500),
+      receivedAt,
+    });
   }
   return items;
 }
@@ -53,9 +71,21 @@ async function collectPostItems(client: Awaited<ReturnType<typeof getClient>>): 
     if (post.id == null) continue;
     const aulaId = `post-${post.id}`;
     if (isAlreadyLogged(aulaId)) continue;
-    const text = `Title: ${post.title ?? '(no title)'}\nFrom: ${post.ownerProfile?.fullName ?? post.ownerProfile?.institution?.institutionName ?? 'unknown'}\nImportant: ${post.isImportant ?? false}\n\n${stripHtml(post.content?.html ?? '').slice(0, 4000)}`;
+    const subject = post.title ?? '(no title)';
+    const sender = post.ownerProfile?.fullName ?? post.ownerProfile?.institution?.institutionName ?? null;
+    const body = stripHtml(post.content?.html ?? '');
+    const text = `Title: ${subject}\nFrom: ${sender ?? 'unknown'}\nImportant: ${post.isImportant ?? false}\n\n${body.slice(0, 4000)}`;
     const receivedAt = new Date(post.publishAt ?? post.timestamp ?? Date.now());
-    items.push({ aula_id: aulaId, source: 'post', child: null, text, receivedAt });
+    items.push({
+      aula_id: aulaId,
+      source: 'post',
+      child: null,
+      subject,
+      sender,
+      text,
+      bodyExcerpt: body.slice(0, 500),
+      receivedAt,
+    });
   }
   return items;
 }
@@ -83,7 +113,16 @@ async function collectNotificationItems(client: Awaited<ReturnType<typeof getCli
     if (isAlreadyLogged(aulaId)) continue;
     const text = JSON.stringify(n).slice(0, 2000);
     const receivedAt = new Date(n?.createdAt ?? n?.timestamp ?? Date.now());
-    items.push({ aula_id: aulaId, source: 'notification', child: null, text, receivedAt });
+    items.push({
+      aula_id: aulaId,
+      source: 'notification',
+      child: null,
+      subject: n?.notificationType ?? 'Aula notification',
+      sender: 'Aula',
+      text,
+      bodyExcerpt: text.slice(0, 500),
+      receivedAt,
+    });
   }
   return items;
 }
@@ -124,8 +163,10 @@ async function main() {
       aula_id: item.aula_id,
       source: item.source,
       child: item.child,
+      subject: item.subject,
+      sender: item.sender,
       received_at: item.receivedAt.toISOString(),
-      raw_excerpt: item.text.slice(0, 500),
+      raw_excerpt: item.bodyExcerpt,
       category: result.category,
       reason: result.reason,
       prompt_version: PROMPT_VERSION,
@@ -134,8 +175,8 @@ async function main() {
     console.log(`  [${result.category}] ${item.source} ${item.aula_id}: ${result.reason}`);
 
     if (result.category === 'immediate') {
-      const firstLine = item.text.split('\n')[0].replace(/^Subject:\s*/, '').slice(0, 80);
-      await sendEmail(`[Aula] ${item.source}: ${firstLine}`, `${item.text}\n\n(reason: ${result.reason})`);
+      const html = digestPageHtml('Aula — Immediate', [{ heading: item.source, items: [logged] }]);
+      await sendEmail(`[Aula] ${item.subject}`, html);
     }
   }
 

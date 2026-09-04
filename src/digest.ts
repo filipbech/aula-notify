@@ -1,13 +1,7 @@
-import { getItemsSince, getWatermark, setWatermark, type ClassifiedItem } from './db.ts';
+import { getItemsSince, getWatermark, setWatermark } from './db.ts';
 import { sendEmail } from './email.ts';
+import { digestPageHtml } from './email-template.ts';
 import { env } from './config.ts';
-
-function formatItems(items: ClassifiedItem[]): string {
-  if (items.length === 0) return '(nothing)';
-  return items
-    .map((i) => `- [${i.source}] ${i.raw_excerpt.split('\n')[0].slice(0, 100)}\n  (${i.reason})`)
-    .join('\n');
-}
 
 async function runDaily() {
   const watermarkKey = 'daily';
@@ -15,8 +9,8 @@ async function runDaily() {
   const now = new Date().toISOString();
 
   const daily = getItemsSince('daily', since);
-  const body = `Daily Aula digest\n\n${formatItems(daily)}`;
-  await sendEmail(`Aula daily digest — ${daily.length} item(s)`, body);
+  const html = digestPageHtml('Aula — Daily Digest', [{ heading: 'Today', items: daily }]);
+  await sendEmail(`Aula daily digest — ${daily.length} item(s)`, html);
   setWatermark(watermarkKey, now);
   console.log(`daily digest sent: ${daily.length} item(s) since ${since}`);
 }
@@ -30,28 +24,21 @@ async function runWeekly() {
   const recapDaily = getItemsSince('daily', since);
   const recapImmediate = getItemsSince('immediate', since);
 
-  const bodyParts = [
-    'Weekly Aula digest',
-    '',
-    'Whole-school items this week:',
-    formatItems(weeklyOnly),
-    '',
-    'In case you missed it — already sent this week:',
-    formatItems([...recapImmediate, ...recapDaily]),
+  const sections = [
+    { heading: 'Whole-school items this week', items: weeklyOnly },
+    { heading: 'In case you missed it — already sent this week', items: [...recapImmediate, ...recapDaily] },
   ];
 
   if (env.showIgnoredInWeekly) {
     const ignored = getItemsSince('ignore', since);
-    bodyParts.push(
-      '',
-      '--- IGNORED THIS WEEK (for review while we tune the classifier — set SHOW_IGNORED_IN_WEEKLY=false to remove this section) ---',
-      formatItems(ignored),
-    );
+    sections.push({
+      heading: 'Ignored this week (for review — set SHOW_IGNORED_IN_WEEKLY=false to remove this section)',
+      items: ignored,
+    });
   }
 
-  const body = bodyParts.join('\n');
-
-  await sendEmail(`Aula weekly digest — ${weeklyOnly.length} item(s)`, body);
+  const html = digestPageHtml('Aula — Weekly Digest', sections);
+  await sendEmail(`Aula weekly digest — ${weeklyOnly.length} item(s)`, html);
   setWatermark(watermarkKey, now);
   console.log(`weekly digest sent: ${weeklyOnly.length} weekly_only item(s), ${recapDaily.length + recapImmediate.length} recap item(s)`);
 }

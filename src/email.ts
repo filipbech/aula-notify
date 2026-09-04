@@ -5,9 +5,9 @@ import { config, env } from './config.ts';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DRY_RUN_LOG = join(HERE, '..', 'dry-run-emails.log');
 
-export async function sendEmail(subject: string, text: string): Promise<void> {
+export async function sendEmail(subject: string, html: string): Promise<void> {
   if (env.dryRun) {
-    const entry = `\n=== ${new Date().toISOString()} ===\nSubject: ${subject}\n\n${text}\n`;
+    const entry = `\n=== ${new Date().toISOString()} ===\nSubject: ${subject}\n\n${html}\n`;
     await Bun.write(DRY_RUN_LOG, (await Bun.file(DRY_RUN_LOG).exists()) ? (await Bun.file(DRY_RUN_LOG).text()) + entry : entry);
     console.log(`[dry-run] would send: ${subject}`);
     return;
@@ -27,7 +27,7 @@ export async function sendEmail(subject: string, text: string): Promise<void> {
       from: 'onboarding@resend.dev',
       to: config.notifyEmail,
       subject,
-      text,
+      html,
     }),
   });
 

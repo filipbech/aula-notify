@@ -10,6 +10,8 @@ db.exec(`
     aula_id TEXT PRIMARY KEY,
     source TEXT NOT NULL,
     child TEXT,
+    subject TEXT,
+    sender TEXT,
     received_at TEXT,
     raw_excerpt TEXT,
     category TEXT NOT NULL,
@@ -29,12 +31,23 @@ db.exec(`
   );
 `);
 
+// Older DBs predate the subject/sender columns — add them if missing (no-op on fresh installs).
+for (const col of ['subject', 'sender']) {
+  try {
+    db.exec(`ALTER TABLE classification_log ADD COLUMN ${col} TEXT`);
+  } catch {
+    // column already exists
+  }
+}
+
 export type Category = 'immediate' | 'daily' | 'weekly_only' | 'ignore';
 
 export interface ClassifiedItem {
   aula_id: string;
   source: string;
   child: string | null;
+  subject: string | null;
+  sender: string | null;
   received_at: string;
   raw_excerpt: string;
   category: Category;
@@ -49,12 +62,14 @@ export function isAlreadyLogged(aulaId: string): boolean {
 export function logItem(item: ClassifiedItem): void {
   db.query(`
     INSERT INTO classification_log
-      (aula_id, source, child, received_at, raw_excerpt, category, reason, prompt_version, classified_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (aula_id, source, child, subject, sender, received_at, raw_excerpt, category, reason, prompt_version, classified_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     item.aula_id,
     item.source,
     item.child,
+    item.subject,
+    item.sender,
     item.received_at,
     item.raw_excerpt,
     item.category,
