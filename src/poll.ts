@@ -131,10 +131,8 @@ async function main() {
     console.log(`  [${result.category}] ${item.source} ${item.aula_id}: ${result.reason}`);
 
     if (result.category === 'immediate') {
-      await sendEmail(
-        `[Aula] ${item.source}: ${item.text.split('\n')[0].slice(0, 80)}`,
-        `${item.text}\n\n(reason: ${result.reason})`,
-      );
+      const firstLine = item.text.split('\n')[0].replace(/^Subject:\s*/, '').slice(0, 80);
+      await sendEmail(`[Aula] ${item.source}: ${firstLine}`, `${item.text}\n\n(reason: ${result.reason})`);
     }
   }
 
