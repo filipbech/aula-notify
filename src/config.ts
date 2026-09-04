@@ -25,7 +25,7 @@ export const config: Config = raw;
 
 export const env = {
   dryRun: process.env.DRY_RUN !== 'false',
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
+  geminiApiKey: process.env.GEMINI_API_KEY ?? '',
   resendApiKey: process.env.RESEND_API_KEY ?? '',
   healthcheckUrl: process.env.HEALTHCHECK_URL ?? '',
 };

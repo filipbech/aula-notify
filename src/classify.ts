@@ -45,14 +45,23 @@ Categories:
 
 When genuinely unsure between two tiers, prefer the more urgent one — a false positive (an extra email) is far cheaper than a missed item.`;
 
+const RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    category: { type: 'string', enum: ['immediate', 'daily', 'weekly_only', 'ignore'] },
+    reason: { type: 'string' },
+  },
+  required: ['category', 'reason'],
+};
+
 export async function classify(input: ClassifyInput): Promise<ClassifyResult> {
   const matched = safetyNetMatch(input.text);
   if (matched) {
     return { category: 'immediate', reason: `safety-net keyword match: "${matched}"` };
   }
 
-  if (!env.anthropicApiKey) {
-    throw new Error('ANTHROPIC_API_KEY not set');
+  if (!env.geminiApiKey) {
+    throw new Error('GEMINI_API_KEY not set');
   }
 
   const userPrompt = `Next daily digest fires at: ${input.nextDigestAt.toISOString()}
@@ -62,27 +71,33 @@ Child: ${input.child ?? '(not child-specific / whole school)'}
 Text:
 ${input.text}`;
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': env.anthropicApiKey,
-      'anthropic-version': '2023-06-01',
+  const res = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-goog-api-key': env.geminiApiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: RESPONSE_SCHEMA,
+        },
+      }),
     },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
-  });
+  );
 
   if (!res.ok) {
-    throw new Error(`classify: Anthropic API returned ${res.status}: ${await res.text()}`);
+    throw new Error(`classify: Gemini API returned ${res.status}: ${await res.text()}`);
   }
 
-  const data = (await res.json()) as { content: { type: string; text?: string }[] };
-  const text = data.content.find((b) => b.type === 'text')?.text ?? '{}';
+  const data = (await res.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
   const parsed = JSON.parse(text) as Partial<ClassifyResult>;
 
   const category = parsed.category as Category | undefined;
