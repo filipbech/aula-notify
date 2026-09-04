@@ -1,7 +1,7 @@
 import { env } from './config.ts';
 import type { Category } from './db.ts';
 
-export const PROMPT_VERSION = 'v2';
+export const PROMPT_VERSION = 'v3';
 
 const STALE_MS = 24 * 60 * 60 * 1000;
 
@@ -56,8 +56,8 @@ The family's own children are named in the request below — only they count as 
 Categories:
 - "immediate": same-day operational disruption (bus/class cancelled, early closure, weather closure) affecting this family's children; safety/serious incident (whole-school scope); a parent-teacher booking slot that's open and unbooked; a "Kontaktbog" (contact book) entry — these are always a teacher writing directly and privately about one specific child, treat as immediate regardless of tone. A deadline-based item only counts as immediate if it falls due before the next daily digest time given below — not simply "due tomorrow".
 - "daily": relevant to this family's specific children, their classes, or their activities — including something organized BY one of this family's own children (e.g. a child hosting a get-together), even if informal. Not urgent.
-- "weekly_only": whole-school or whole-class, not urgent. This includes greetings, farewells, or general updates written BY school staff (a teacher, "Team X", or the headmaster) even when they contain no action items — a genuine message from staff is still worth knowing, not noise.
-- "ignore": genuinely irrelevant to this family — other classes'/grades' business not involving this family's children, an off-topic aside from an unrelated parent about their own child, expired sign-up threads, or pure platform noise (e.g. routine new-photo-in-album notifications).
+- "weekly_only": whole-school, OR any genuine message written BY school staff (a named teacher, a class "Team", SFO staff, or the headmaster) — even when it's about a different class than this family's own, and even when it's purely a greeting/farewell with no action items. Staff-authored content is always at least weekly_only, never "ignore" — it's legitimate school communication, just not urgent or actionable.
+- "ignore": reserved for things with no genuine school-staff origin — an off-topic aside from an unrelated parent about their own unrelated child, private/informal parent-to-parent chatter not involving staff, a thread explicitly noted by a participant as expired/spam, or pure platform-generated noise (e.g. routine new-photo-in-album notifications).
 
 When genuinely unsure between two tiers, prefer the more urgent one — a false positive (an extra email) is far cheaper than a missed item.`;
 
