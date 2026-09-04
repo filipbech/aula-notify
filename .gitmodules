@@ -1,0 +1,3 @@
+[submodule "aula-mcp"]
+	path = aula-mcp
+	url = https://github.com/Casperjuel/aula-mcp.git
