@@ -30,4 +30,5 @@ export const env = {
   resendApiKey: process.env.RESEND_API_KEY ?? '',
   healthcheckUrl: process.env.HEALTHCHECK_URL ?? '',
   showIgnoredInWeekly: process.env.SHOW_IGNORED_IN_WEEKLY !== 'false',
+  skipEmptyDigests: process.env.SKIP_EMPTY_DIGESTS === 'true',
 };

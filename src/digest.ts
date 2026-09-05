@@ -18,6 +18,7 @@ async function runDaily() {
   let title = 'Aula — Daily Digest';
   let subject = `Aula daily digest — ${daily.length} item(s)`;
   const watermarksToAdvance: [string, string][] = [['daily', nowIso]];
+  let weeklyOnlyCount = 0;
 
   if (isFridayCopenhagen(now)) {
     const weeklySince = getWatermark('weekly') ?? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -41,6 +42,14 @@ async function runDaily() {
     title = 'Aula — Daily + Weekly Digest';
     subject = `Aula daily digest — ${daily.length} item(s), weekly — ${weeklyOnly.length} item(s)`;
     watermarksToAdvance.push(['weekly', nowIso]);
+    weeklyOnlyCount = weeklyOnly.length;
+  }
+
+  const hasNewContent = daily.length > 0 || weeklyOnlyCount > 0;
+  if (env.skipEmptyDigests && !hasNewContent) {
+    for (const [key, ts] of watermarksToAdvance) setWatermark(key, ts);
+    console.log('digest skipped: nothing new (SKIP_EMPTY_DIGESTS=true)');
+    return;
   }
 
   const html = digestPageHtml(title, sections);
