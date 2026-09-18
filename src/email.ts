@@ -24,7 +24,7 @@ export async function sendEmail(subject: string, html: string): Promise<void> {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'onboarding@resend.dev',
+      from: env.fromEmail,
       to: config.notifyEmail,
       subject,
       html,

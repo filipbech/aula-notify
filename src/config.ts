@@ -28,6 +28,7 @@ export const env = {
   dryRun: process.env.DRY_RUN !== 'false',
   geminiApiKey: process.env.GEMINI_API_KEY ?? '',
   resendApiKey: process.env.RESEND_API_KEY ?? '',
+  fromEmail: process.env.FROM_EMAIL ?? 'onboarding@resend.dev',
   healthcheckUrl: process.env.HEALTHCHECK_URL ?? '',
   showIgnoredInWeekly: process.env.SHOW_IGNORED_IN_WEEKLY !== 'false',
   skipEmptyDigests: process.env.SKIP_EMPTY_DIGESTS === 'true',
