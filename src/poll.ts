@@ -90,6 +90,59 @@ async function collectPostItems(client: Awaited<ReturnType<typeof getClient>>): 
   return items;
 }
 
+function formatCopenhagen(iso: string): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Copenhagen',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+  return `${get('day')}-${get('month')}-${get('year')} ${get('hour')}:${get('minute')}`;
+}
+
+// getNotifications() returns an untyped envelope upstream (see README's
+// "Known limitations") — every notificationEventType we haven't seen yet
+// falls back to a plain, non-JSON summary instead of dumping the raw object
+// into an email, and logs the raw shape so it can be added here later.
+function describeNotification(n: any): { subject: string; sender: string; summary: string } {
+  const area: string | undefined = n?.notificationArea;
+  const eventType: string = n?.notificationEventType ?? n?.notificationType ?? 'notification';
+  const sender = area ? `Aula ${area}` : 'Aula';
+
+  if (typeof n?.title === 'string') {
+    const when = n.startTime
+      ? n.endTime
+        ? `${formatCopenhagen(n.startTime)} – ${formatCopenhagen(n.endTime)}`
+        : formatCopenhagen(n.startTime)
+      : null;
+    const deadline = n.expires ? `Respond by ${formatCopenhagen(n.expires)}.` : '';
+    return {
+      subject: n.title,
+      sender,
+      summary: [when ? `When: ${when}` : null, deadline].filter(Boolean).join(' '),
+    };
+  }
+
+  if (eventType === 'NewMedia') {
+    return {
+      subject: 'New photo/media in an album',
+      sender,
+      summary: n?.relatedChildName ? `Related to: ${n.relatedChildName}` : 'A new photo or video was added to a school album.',
+    };
+  }
+
+  console.warn('describeNotification: unrecognized shape, add a case for it. Raw:', JSON.stringify(n).slice(0, 500));
+  return {
+    subject: 'Aula notification',
+    sender,
+    summary: `(unrecognized notification type "${eventType}" — logged for review, see server logs)`,
+  };
+}
+
 async function collectNotificationItems(client: Awaited<ReturnType<typeof getClient>>): Promise<RawItem[]> {
   const raw = (await client.getNotifications()) as unknown;
   const items: RawItem[] = [];
@@ -107,20 +160,22 @@ async function collectNotificationItems(client: Awaited<ReturnType<typeof getCli
   }
 
   for (const n of list as any[]) {
-    const id = n?.id ?? n?.notificationId;
+    const id = (n as any)?.id ?? (n as any)?.notificationId;
     if (id == null) continue;
     const aulaId = `notif-${id}`;
     if (isAlreadyLogged(aulaId)) continue;
-    const text = JSON.stringify(n).slice(0, 2000);
-    const receivedAt = new Date(n?.createdAt ?? n?.timestamp ?? Date.now());
+
+    const { subject, sender, summary } = describeNotification(n);
+    const text = `Subject: ${subject}\n${summary}`;
+    const receivedAt = new Date((n as any)?.triggered ?? (n as any)?.createdAt ?? (n as any)?.timestamp ?? Date.now());
     items.push({
       aula_id: aulaId,
       source: 'notification',
       child: null,
-      subject: n?.notificationType ?? 'Aula notification',
-      sender: 'Aula',
+      subject,
+      sender,
       text,
-      bodyExcerpt: text.slice(0, 500),
+      bodyExcerpt: summary,
       receivedAt,
     });
   }
