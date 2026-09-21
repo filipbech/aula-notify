@@ -160,7 +160,11 @@ async function collectNotificationItems(client: Awaited<ReturnType<typeof getCli
   }
 
   for (const n of list as any[]) {
-    const id = (n as any)?.id ?? (n as any)?.notificationId;
+    // Aula sends separate "Alert" and "Badge" notifications for the same
+    // underlying event/eventId — key on eventId when present so both
+    // variants collapse into one item instead of firing/logging twice.
+    const eventId = (n as any)?.eventId;
+    const id = eventId != null ? `event-${eventId}` : ((n as any)?.id ?? (n as any)?.notificationId);
     if (id == null) continue;
     const aulaId = `notif-${id}`;
     if (isAlreadyLogged(aulaId)) continue;
