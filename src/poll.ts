@@ -12,6 +12,7 @@ interface RawItem {
   child: string | null;
   subject: string;
   sender: string | null;
+  link: string | null;
   text: string;
   bodyExcerpt: string;
   receivedAt: Date;
@@ -56,6 +57,7 @@ async function collectThreadItems(client: Awaited<ReturnType<typeof getClient>>)
       child: null,
       subject,
       sender,
+      link: `https://www.aula.dk/portal/#/beskeder/${thread.id}`,
       text,
       bodyExcerpt: body.slice(0, 500),
       receivedAt,
@@ -82,6 +84,7 @@ async function collectPostItems(client: Awaited<ReturnType<typeof getClient>>): 
       child: null,
       subject,
       sender,
+      link: `https://www.aula.dk/portal/#/overblik/${post.id}`,
       text,
       bodyExcerpt: body.slice(0, 500),
       receivedAt,
@@ -108,10 +111,25 @@ function formatCopenhagen(iso: string): string {
 // "Known limitations") — every notificationEventType we haven't seen yet
 // falls back to a plain, non-JSON summary instead of dumping the raw object
 // into an email, and logs the raw shape so it can be added here later.
-function describeNotification(n: any): { subject: string; sender: string; summary: string } {
+//
+// `groupId`/`groupName` exist on the envelope generically but are null on
+// most notification types we've seen live — use them whenever actually
+// present rather than hardcoding this family's group IDs, so linking stays
+// correct automatically as the kids move to new classes/groups over time.
+function describeNotification(n: any): { subject: string; sender: string; summary: string; link: string | null } {
   const area: string | undefined = n?.notificationArea;
   const eventType: string = n?.notificationEventType ?? n?.notificationType ?? 'notification';
   const sender = area ? `Aula ${area}` : 'Aula';
+  const groupLink = n?.groupId != null ? `https://www.aula.dk/portal/#/gruppe/${n.groupId}/kalender` : null;
+
+  if (eventType === 'PostSharedWithMe' && n?.postId != null) {
+    return {
+      subject: n.postTitle ?? 'Aula post',
+      sender,
+      summary: 'A post was shared with you.',
+      link: `https://www.aula.dk/portal/#/overblik/${n.postId}`,
+    };
+  }
 
   if (typeof n?.title === 'string') {
     const when = n.startTime
@@ -124,6 +142,7 @@ function describeNotification(n: any): { subject: string; sender: string; summar
       subject: n.title,
       sender,
       summary: [when ? `When: ${when}` : null, deadline].filter(Boolean).join(' '),
+      link: groupLink,
     };
   }
 
@@ -132,6 +151,7 @@ function describeNotification(n: any): { subject: string; sender: string; summar
       subject: 'New photo/media in an album',
       sender,
       summary: n?.relatedChildName ? `Related to: ${n.relatedChildName}` : 'A new photo or video was added to a school album.',
+      link: groupLink,
     };
   }
 
@@ -140,6 +160,7 @@ function describeNotification(n: any): { subject: string; sender: string; summar
     subject: 'Aula notification',
     sender,
     summary: `(unrecognized notification type "${eventType}" — logged for review, see server logs)`,
+    link: groupLink,
   };
 }
 
@@ -169,7 +190,7 @@ async function collectNotificationItems(client: Awaited<ReturnType<typeof getCli
     const aulaId = `notif-${id}`;
     if (isAlreadyLogged(aulaId)) continue;
 
-    const { subject, sender, summary } = describeNotification(n);
+    const { subject, sender, summary, link } = describeNotification(n);
     const text = `Subject: ${subject}\n${summary}`;
     const receivedAt = new Date((n as any)?.triggered ?? (n as any)?.createdAt ?? (n as any)?.timestamp ?? Date.now());
     items.push({
@@ -178,6 +199,7 @@ async function collectNotificationItems(client: Awaited<ReturnType<typeof getCli
       child: null,
       subject,
       sender,
+      link,
       text,
       bodyExcerpt: summary,
       receivedAt,
@@ -224,6 +246,7 @@ async function main() {
       child: item.child,
       subject: item.subject,
       sender: item.sender,
+      link: item.link,
       received_at: item.receivedAt.toISOString(),
       raw_excerpt: item.bodyExcerpt,
       category: result.category,

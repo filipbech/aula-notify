@@ -12,6 +12,7 @@ db.exec(`
     child TEXT,
     subject TEXT,
     sender TEXT,
+    link TEXT,
     received_at TEXT,
     raw_excerpt TEXT,
     category TEXT NOT NULL,
@@ -31,8 +32,8 @@ db.exec(`
   );
 `);
 
-// Older DBs predate the subject/sender columns — add them if missing (no-op on fresh installs).
-for (const col of ['subject', 'sender']) {
+// Older DBs predate the subject/sender/link columns — add them if missing (no-op on fresh installs).
+for (const col of ['subject', 'sender', 'link']) {
   try {
     db.exec(`ALTER TABLE classification_log ADD COLUMN ${col} TEXT`);
   } catch {
@@ -48,6 +49,7 @@ export interface ClassifiedItem {
   child: string | null;
   subject: string | null;
   sender: string | null;
+  link: string | null;
   received_at: string;
   raw_excerpt: string;
   category: Category;
@@ -62,14 +64,15 @@ export function isAlreadyLogged(aulaId: string): boolean {
 export function logItem(item: ClassifiedItem): void {
   db.query(`
     INSERT INTO classification_log
-      (aula_id, source, child, subject, sender, received_at, raw_excerpt, category, reason, prompt_version, classified_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (aula_id, source, child, subject, sender, link, received_at, raw_excerpt, category, reason, prompt_version, classified_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     item.aula_id,
     item.source,
     item.child,
     item.subject,
     item.sender,
+    item.link,
     item.received_at,
     item.raw_excerpt,
     item.category,

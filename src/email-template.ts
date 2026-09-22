@@ -31,6 +31,9 @@ export function itemCardHtml(item: ClassifiedItem): string {
   const sender = escapeHtml(item.sender ?? 'Unknown sender');
   const when = formatDate(item.received_at);
   const body = escapeHtml(item.raw_excerpt).slice(0, 600).replace(/\n/g, '<br>');
+  const link = item.link
+    ? `<div style="margin-top:10px;"><a href="${escapeHtml(item.link)}" style="font-size:13px;color:#1a56db;text-decoration:none;">View in Aula &rarr;</a></div>`
+    : '';
 
   return `
   <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:12px;background:#ffffff;">
@@ -38,6 +41,7 @@ export function itemCardHtml(item: ClassifiedItem): string {
     <div style="font-size:16px;font-weight:600;color:#111827;margin-top:8px;margin-bottom:4px;">${subject}</div>
     <div style="font-size:13px;color:#6b7280;margin-bottom:10px;">${sender} &middot; ${when}</div>
     <div style="font-size:14px;color:#374151;line-height:1.5;">${body}</div>
+    ${link}
     <div style="font-size:12px;color:#9ca3af;margin-top:10px;font-style:italic;">${escapeHtml(item.reason)}</div>
   </div>`;
 }
