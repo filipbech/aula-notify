@@ -1,4 +1,4 @@
-import { getClient } from './aula.ts';
+import { getClient, getFamilyInstitutionProfileIds } from './aula.ts';
 import { classify, PROMPT_VERSION } from './classify.ts';
 import { isAlreadyLogged, logItem, type ClassifiedItem } from './db.ts';
 import { nextDailyDigestTime } from './digest-time.ts';
@@ -67,7 +67,10 @@ async function collectThreadItems(client: Awaited<ReturnType<typeof getClient>>)
 }
 
 async function collectPostItems(client: Awaited<ReturnType<typeof getClient>>): Promise<RawItem[]> {
-  const data = await client.getPosts({ limit: 20 });
+  const data = await client.getPosts({
+    limit: 20,
+    institutionProfileIds: await getFamilyInstitutionProfileIds(client),
+  });
   const items: RawItem[] = [];
   for (const post of data?.posts ?? []) {
     if (post.id == null) continue;
@@ -164,6 +167,18 @@ function describeNotification(n: any): { subject: string; sender: string; summar
   };
 }
 
+// notificationId is `<eventType>:<entityId>:<Alert|Badge>`. Aula sends both
+// variants for one event, so drop only that last segment. Keying on entityId
+// alone would also swallow a later "changed"/"cancelled" notification for the
+// same event, which is exactly the one we'd want to see.
+function notificationKey(n: any): string | null {
+  const notificationId = n?.notificationId;
+  if (typeof notificationId === 'string' && notificationId.length > 0) {
+    return notificationId.replace(/:[^:]+$/, '');
+  }
+  return n?.id != null ? String(n.id) : null;
+}
+
 async function collectNotificationItems(client: Awaited<ReturnType<typeof getClient>>): Promise<RawItem[]> {
   const raw = (await client.getNotifications()) as unknown;
   const items: RawItem[] = [];
@@ -181,11 +196,7 @@ async function collectNotificationItems(client: Awaited<ReturnType<typeof getCli
   }
 
   for (const n of list as any[]) {
-    // Aula sends separate "Alert" and "Badge" notifications for the same
-    // underlying event/eventId — key on eventId when present so both
-    // variants collapse into one item instead of firing/logging twice.
-    const eventId = (n as any)?.eventId;
-    const id = eventId != null ? `event-${eventId}` : ((n as any)?.id ?? (n as any)?.notificationId);
+    const id = notificationKey(n);
     if (id == null) continue;
     const aulaId = `notif-${id}`;
     if (isAlreadyLogged(aulaId)) continue;

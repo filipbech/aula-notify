@@ -32,7 +32,7 @@ export function itemCardHtml(item: ClassifiedItem): string {
   const when = formatDate(item.received_at);
   const body = escapeHtml(item.raw_excerpt).slice(0, 600).replace(/\n/g, '<br>');
   const link = item.link
-    ? `<div style="margin-top:10px;"><a href="${escapeHtml(item.link)}" style="font-size:13px;color:#1a56db;text-decoration:none;">View in Aula &rarr;</a></div>`
+    ? `<div style="margin-top:10px;"><a href="${escapeHtml(item.link)}" style="font-size:13px;color:#1a56db;text-decoration:none;">Open in Aula (web) &rarr;</a></div>`
     : '';
 
   return `

@@ -39,3 +39,27 @@ export async function getClient(): Promise<AulaClient> {
 export function childName(childId: number): string {
   return config.children.find((c) => c.id === childId)?.name ?? String(childId);
 }
+
+type ConsentEntry = { institutionProfile?: { id?: number; role?: string } };
+
+// posts.getAllPosts answers 200 with an empty feed unless it's scoped to the
+// family's institution profiles, and profiles.getProfilesByLogin omits the
+// club (Klub/SFO) child profiles. The consent list carries all of them — same
+// source aula-mcp's own posts tool uses.
+export async function getFamilyInstitutionProfileIds(client: AulaClient): Promise<number[]> {
+  const raw = (await client.rawRequest('consents.getConsentResponses', {
+    returnOnlyPendingConsentResponses: 'false',
+  })) as ConsentEntry[] | { data?: ConsentEntry[] } | null;
+  const entries = Array.isArray(raw) ? raw : (raw?.data ?? []);
+
+  const guardianIds: number[] = [];
+  const childIds: number[] = [];
+  for (const { institutionProfile: ip } of entries) {
+    if (!ip?.id) continue;
+    (ip.role === 'guardian' ? guardianIds : childIds).push(ip.id);
+  }
+  if (guardianIds.length === 0) {
+    throw new Error('getFamilyInstitutionProfileIds: no guardian profile in consent responses');
+  }
+  return [...new Set([...guardianIds, ...childIds])];
+}
