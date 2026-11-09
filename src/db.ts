@@ -137,3 +137,14 @@ export function markHandled(aulaId: string): void {
     aulaId,
   );
 }
+
+/** Messages we logged recently that Aula may still be flagging as unread. */
+export function getUnmarkedMessageItems(sinceIso: string): ClassifiedItem[] {
+  return db
+    .query(
+      `SELECT * FROM classification_log
+       WHERE source = 'message' AND thread_id IS NOT NULL AND message_id IS NOT NULL
+         AND marked_read_at IS NULL AND classified_at > ?`,
+    )
+    .all(sinceIso) as ClassifiedItem[];
+}

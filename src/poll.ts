@@ -1,6 +1,12 @@
 import { getClient, getFamilyInstitutionProfileIds } from './aula.ts';
 import { classify, PROMPT_VERSION } from './classify.ts';
-import { isAlreadyLogged, logItem, markHandled, type ClassifiedItem } from './db.ts';
+import {
+  getUnmarkedMessageItems,
+  isAlreadyLogged,
+  logItem,
+  markHandled,
+  type ClassifiedItem,
+} from './db.ts';
 import { nextDailyDigestTime } from './digest-time.ts';
 import { config, env } from './config.ts';
 import { sendEmail } from './email.ts';
@@ -282,12 +288,20 @@ async function main() {
     if (result.category === 'immediate') {
       const html = digestPageHtml('Aula — Immediate', [{ heading: item.source, items: [logged] }]);
       await sendEmail(`[Aula] ${item.subject}`, html);
-      // The email is out, so stop Aula flagging it. Never let this break polling.
-      if (env.markAulaRead && !env.dryRun) {
-        await markMessagesRead(client, [logged], markHandled).catch((err) =>
-          console.error('mark-read failed:', err),
-        );
+    }
+  }
+
+  // Mark messages read as soon as we've seen them (any category), so the Aula
+  // app doesn't flag things that look like they need action. Also retries
+  // recent ones whose marking failed. Never let this break polling.
+  if (env.markAulaRead && !env.dryRun) {
+    try {
+      const pending = getUnmarkedMessageItems(new Date(Date.now() - 2 * 86_400_000).toISOString());
+      if (pending.length > 0) {
+        console.log(`mark-read: ${JSON.stringify(await markMessagesRead(client, pending, markHandled))}`);
       }
+    } catch (err) {
+      console.error('mark-read failed:', err);
     }
   }
 

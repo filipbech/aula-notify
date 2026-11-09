@@ -81,7 +81,7 @@ Environment variables (`.env`, not committed):
 | `DRY_RUN` | `false` to send real emails; anything else (or unset) logs to `dry-run-emails.log` instead |
 | `SHOW_IGNORED_IN_WEEKLY` | `false` to drop the ignored-items review section once you trust the classifier |
 | `SKIP_EMPTY_DIGESTS` | `true` to stop sending a digest when there's nothing new |
-| `MARK_AULA_READ` | `false` to stop marking emailed messages as read in Aula (on by default; skipped in dry-run) |
+| `MARK_AULA_READ` | `false` to stop marking seen messages as read in Aula (on by default; skipped in dry-run) |
 | `HEALTHCHECK_URL` | Optional dead-man's-switch ping (e.g. healthchecks.io) on every successful poll |
 
 `aula-mcp` itself needs a one-time interactive login:
@@ -108,12 +108,13 @@ Runs on a small always-on VM via cron:
 
 ## Known limitations
 
-- Aula's unread flag is only cleared for **messages**, after the email containing
-  them is sent (immediately for `immediate`, with the digest for the rest).
-  `aula-mcp` has no mark-as-read call for posts or notifications, so those badges
-  stay. Aula moves a per-thread read marker rather than flipping a flag, so the
-  marker is only moved when the thread is still unread and still ends at the
-  message that was emailed; otherwise it could un-read something newer.
+- Aula's unread flag is only cleared for **messages**, and it's cleared as soon
+  as the poller has seen them, whatever their category — so the app doesn't flag
+  things that look like they need action. `aula-mcp` has no mark-as-read call for
+  posts or notifications, so those badges stay. Aula moves a per-thread read
+  marker rather than flipping a flag, so the marker is only moved when the thread
+  is still unread and still ends at the message that was logged; otherwise it
+  could un-read something newer.
 - No booking-slot (parent-teacher conference) alerts yet — `aula-mcp` has no
   booking support at all; this needs reverse-engineering from Aula's own web
   client.
