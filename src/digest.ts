@@ -1,7 +1,9 @@
-import { getItemsSince, getWatermark, setWatermark } from './db.ts';
+import { getItemsSince, getWatermark, markHandled, setWatermark } from './db.ts';
 import { sendEmail } from './email.ts';
 import { digestPageHtml } from './email-template.ts';
 import { env } from './config.ts';
+import { getClient } from './aula.ts';
+import { markMessagesRead } from './mark-read.ts';
 
 function isFridayCopenhagen(now: Date): boolean {
   return new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Copenhagen', weekday: 'short' }).format(now) === 'Fri';
@@ -56,6 +58,23 @@ async function runDaily() {
   await sendEmail(subject, html);
   for (const [key, ts] of watermarksToAdvance) setWatermark(key, ts);
   console.log(`digest sent: ${subject}`);
+
+  // Everything in the email has now reached the user, so stop Aula flagging it.
+  // The email and watermarks are already done; a failure here only costs a badge.
+  if (env.markAulaRead && !env.dryRun) {
+    const seen = new Set<string>();
+    const toMark = sections
+      .flatMap((s) => s.items)
+      .filter((i) => i.source === 'message' && !i.marked_read_at && !seen.has(i.aula_id) && seen.add(i.aula_id));
+    if (toMark.length > 0) {
+      try {
+        const r = await markMessagesRead(await getClient(), toMark, markHandled);
+        console.log(`mark-read: ${JSON.stringify(r)}`);
+      } catch (err) {
+        console.error('mark-read failed:', err);
+      }
+    }
+  }
 }
 
 const mode = process.argv[2];

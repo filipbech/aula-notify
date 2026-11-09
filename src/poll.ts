@@ -1,10 +1,11 @@
 import { getClient, getFamilyInstitutionProfileIds } from './aula.ts';
 import { classify, PROMPT_VERSION } from './classify.ts';
-import { isAlreadyLogged, logItem, type ClassifiedItem } from './db.ts';
+import { isAlreadyLogged, logItem, markHandled, type ClassifiedItem } from './db.ts';
 import { nextDailyDigestTime } from './digest-time.ts';
 import { config, env } from './config.ts';
 import { sendEmail } from './email.ts';
 import { digestPageHtml } from './email-template.ts';
+import { markMessagesRead } from './mark-read.ts';
 
 interface RawItem {
   aula_id: string;
@@ -13,6 +14,8 @@ interface RawItem {
   subject: string;
   sender: string | null;
   link: string | null;
+  threadId: number | null;
+  messageId: string | null;
   text: string;
   bodyExcerpt: string;
   receivedAt: Date;
@@ -58,6 +61,8 @@ async function collectThreadItems(client: Awaited<ReturnType<typeof getClient>>)
       subject,
       sender,
       link: `https://www.aula.dk/portal/#/beskeder/${thread.id}`,
+      threadId: thread.id,
+      messageId: msgId ?? null,
       text,
       bodyExcerpt: body.slice(0, 500),
       receivedAt,
@@ -88,6 +93,8 @@ async function collectPostItems(client: Awaited<ReturnType<typeof getClient>>): 
       subject,
       sender,
       link: `https://www.aula.dk/portal/#/overblik/${post.id}`,
+      threadId: null,
+      messageId: null,
       text,
       bodyExcerpt: body.slice(0, 500),
       receivedAt,
@@ -211,6 +218,8 @@ async function collectNotificationItems(client: Awaited<ReturnType<typeof getCli
       subject,
       sender,
       link,
+      threadId: null,
+      messageId: null,
       text,
       bodyExcerpt: summary,
       receivedAt,
@@ -258,6 +267,9 @@ async function main() {
       subject: item.subject,
       sender: item.sender,
       link: item.link,
+      thread_id: item.threadId,
+      message_id: item.messageId,
+      marked_read_at: null,
       received_at: item.receivedAt.toISOString(),
       raw_excerpt: item.bodyExcerpt,
       category: result.category,
@@ -270,6 +282,12 @@ async function main() {
     if (result.category === 'immediate') {
       const html = digestPageHtml('Aula — Immediate', [{ heading: item.source, items: [logged] }]);
       await sendEmail(`[Aula] ${item.subject}`, html);
+      // The email is out, so stop Aula flagging it. Never let this break polling.
+      if (env.markAulaRead && !env.dryRun) {
+        await markMessagesRead(client, [logged], markHandled).catch((err) =>
+          console.error('mark-read failed:', err),
+        );
+      }
     }
   }
 

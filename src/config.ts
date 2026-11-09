@@ -32,4 +32,5 @@ export const env = {
   healthcheckUrl: process.env.HEALTHCHECK_URL ?? '',
   showIgnoredInWeekly: process.env.SHOW_IGNORED_IN_WEEKLY !== 'false',
   skipEmptyDigests: process.env.SKIP_EMPTY_DIGESTS === 'true',
+  markAulaRead: process.env.MARK_AULA_READ !== 'false',
 };

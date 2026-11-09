@@ -13,6 +13,9 @@ db.exec(`
     subject TEXT,
     sender TEXT,
     link TEXT,
+    thread_id INTEGER,
+    message_id TEXT,
+    marked_read_at TEXT,
     received_at TEXT,
     raw_excerpt TEXT,
     category TEXT NOT NULL,
@@ -32,10 +35,17 @@ db.exec(`
   );
 `);
 
-// Older DBs predate the subject/sender/link columns — add them if missing (no-op on fresh installs).
-for (const col of ['subject', 'sender', 'link']) {
+// Older DBs predate these columns — add them if missing (no-op on fresh installs).
+for (const [col, type] of [
+  ['subject', 'TEXT'],
+  ['sender', 'TEXT'],
+  ['link', 'TEXT'],
+  ['thread_id', 'INTEGER'],
+  ['message_id', 'TEXT'],
+  ['marked_read_at', 'TEXT'],
+]) {
   try {
-    db.exec(`ALTER TABLE classification_log ADD COLUMN ${col} TEXT`);
+    db.exec(`ALTER TABLE classification_log ADD COLUMN ${col} ${type}`);
   } catch {
     // column already exists
   }
@@ -50,6 +60,10 @@ export interface ClassifiedItem {
   subject: string | null;
   sender: string | null;
   link: string | null;
+  /** Aula thread + newest message at the time we logged it; messages only. */
+  thread_id: number | null;
+  message_id: string | null;
+  marked_read_at: string | null;
   received_at: string;
   raw_excerpt: string;
   category: Category;
@@ -64,8 +78,8 @@ export function isAlreadyLogged(aulaId: string): boolean {
 export function logItem(item: ClassifiedItem): void {
   db.query(`
     INSERT INTO classification_log
-      (aula_id, source, child, subject, sender, link, received_at, raw_excerpt, category, reason, prompt_version, classified_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (aula_id, source, child, subject, sender, link, thread_id, message_id, received_at, raw_excerpt, category, reason, prompt_version, classified_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     item.aula_id,
     item.source,
@@ -73,6 +87,8 @@ export function logItem(item: ClassifiedItem): void {
     item.subject,
     item.sender,
     item.link,
+    item.thread_id,
+    item.message_id,
     item.received_at,
     item.raw_excerpt,
     item.category,
@@ -112,5 +128,12 @@ export function recordBookingAlertSent(eventId: string): void {
   db.query('INSERT OR IGNORE INTO booking_alerts_sent (event_id, alerted_at) VALUES (?, ?)').run(
     eventId,
     new Date().toISOString(),
+  );
+}
+
+export function markHandled(aulaId: string): void {
+  db.query('UPDATE classification_log SET marked_read_at = ? WHERE aula_id = ?').run(
+    new Date().toISOString(),
+    aulaId,
   );
 }
