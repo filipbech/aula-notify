@@ -19,6 +19,7 @@ async function runDaily() {
   let subject = `Aula daily digest — ${daily.length} item(s)`;
   const watermarksToAdvance: [string, string][] = [['daily', nowIso]];
   let weeklyOnlyCount = 0;
+  let ignoredCount = 0;
 
   if (isFridayCopenhagen(now)) {
     const weeklySince = getWatermark('weekly') ?? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -33,9 +34,11 @@ async function runDaily() {
     });
 
     if (env.showIgnoredInWeekly) {
+      const ignored = getItemsSince('ignore', weeklySince);
+      ignoredCount = ignored.length;
       sections.push({
         heading: 'Ignored this week (for review — set SHOW_IGNORED_IN_WEEKLY=false to remove this section)',
-        items: getItemsSince('ignore', weeklySince),
+        items: ignored,
       });
     }
 
@@ -45,7 +48,9 @@ async function runDaily() {
     weeklyOnlyCount = weeklyOnly.length;
   }
 
-  const hasNewContent = daily.length > 0 || weeklyOnlyCount > 0;
+  // The ignored-items review counts as content while it's shown: the watermarks
+  // advance on a skip, so a skipped Friday would drop that week's list for good.
+  const hasNewContent = daily.length > 0 || weeklyOnlyCount > 0 || ignoredCount > 0;
   if (env.skipEmptyDigests && !hasNewContent) {
     for (const [key, ts] of watermarksToAdvance) setWatermark(key, ts);
     console.log('digest skipped: nothing new (SKIP_EMPTY_DIGESTS=true)');
@@ -56,7 +61,6 @@ async function runDaily() {
   await sendEmail(subject, html);
   for (const [key, ts] of watermarksToAdvance) setWatermark(key, ts);
   console.log(`digest sent: ${subject}`);
-
 }
 
 const mode = process.argv[2];
